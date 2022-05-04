@@ -1,0 +1,152 @@
+---
+title: "Stat479_Portfollio4"
+author: "Haoxuan Sun"
+date: "5/4/2022"
+output: pdf_document
+---
+
+```{r, warning = FALSE}
+library(maps)
+library(sf)
+library(ggmap)
+library(ggplot2)
+library(tidyverse)
+library(readr)
+library(tsibble)
+library(patchwork)
+
+meteor = read_csv("meteorite-landings.csv")
+```
+
+```{r, message = FALSE}
+#create a base ggplot object
+g = ggplot() + 
+  coord_fixed() + 
+  xlab("longitude") + 
+  ylab("latitude")
+
+#specify the theme of maps
+theme = theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_rect(fill = "white", colour = "white"),
+        axis.ticks = element_blank(),
+        axis.text = element_blank()
+        )
+
+#create a ggplot object contain map of US mainland
+us_map = g + 
+  geom_polygon(data = map_data("county"), 
+               aes(long, lat, group = group), 
+               col = "dark grey", 
+               fill = "dark grey"
+               ) + 
+  theme
+
+#create a ggplot object contain a world map
+world_map = g + 
+  geom_polygon(data = map_data("world"), 
+               aes(long, lat, group = group), 
+               col = "light blue", 
+               fill = "light blue"
+               ) + 
+  theme
+```
+
+```{r, message = FALSE}
+#convert original data set into sf format
+meteor_omit_sf = meteor %>% 
+  na.omit() %>% 
+  select(c(-GeoLocation)) %>% 
+  st_as_sf(coords = c("reclong", "reclat"), crs = 4269) %>% 
+  mutate_if(., is.character, as.factor) %>% 
+  filter((year > 1925) & (year < 2014))
+
+#convert original data set into tsibble format
+meteor_omit_tsibble = meteor %>% 
+  na.omit() %>% 
+  group_by(year, fall) %>% 
+  summarise(count = n()) %>% 
+  mutate_if(., is.character, as.factor) %>% 
+  filter((year > 1925) & (year < 2014))
+```
+
+###Visualization of Meteor Landing Spatial Data
+
+```{r, warning = FALSE, message = FALSE, fig.height = 10, fig.width = 15}
+#filter meteors which their landings are observed
+meteor_Obs = meteor_omit_sf %>% 
+  filter(fall == "Fell")
+
+#filter meteors which their landings are not observed
+meteor_nObs = meteor_omit_sf %>%  
+  filter(fall == "Found")
+
+#plot the global meteor landing maps, 
+#size of the points is encoded with meteor size, 
+#color of of the points is encoded with whether the meteor's landing is observed;
+#blue is observed, red is non-observed
+world_map_meteor = world_map + 
+  geom_sf(data = meteor_Obs, 
+          aes(size = log(mass), 
+          color = fall), 
+          alpha = I(0.2)
+          ) + 
+  geom_sf(data = meteor_nObs, 
+          aes(size = log(mass), 
+          color = fall), 
+          alpha = I(0.2)
+          ) + 
+  scale_color_manual(values = c("#5A94FF", "#FF6161")) + 
+  ggtitle("Global Meteorites From 1925 to 2013") + 
+  labs(size = "Mass", color = "Observe")
+world_map_meteor
+
+#plot the meteor landing in the U.S. 
+#size of the points is encoded with meteor size,
+#color of the points is encoded with year
+us_map_meteor = us_map + 
+  geom_sf(data = meteor_omit_sf, 
+          aes(color = year,
+          size = log(mass)), 
+          alpha = I(0.2)
+          ) + 
+  scale_colour_distiller(palette = 8, direction = 1) + 
+  coord_sf(xlim = c(-128, -62), 
+           ylim = c(25, 50)
+           ) + 
+  ggtitle("Meteorites in US From 1925 to 2013") + 
+  labs(size = "Mass")
+us_map_meteor
+```
+
+###Visualization of Meteor Landing Time Series Data
+
+```{r, message = FALSE}
+#create a time series visualization with observed/non-observed meteors
+ggplot(meteor_omit_tsibble) + 
+  geom_line(aes(year, count, col = fall)) + 
+  facet_wrap(.~ fall) + 
+  scale_x_continuous(expand = c(0,0)) + 
+  scale_y_continuous(expand = c(0,0)) + 
+  theme_bw() + 
+  scale_colour_manual(values = c("red", "blue")) + 
+  ggtitle("Meteorite on Earth From 1925 to 2013") + 
+  xlab("Year") + 
+  ylab("Count")
+  
+
+meteor_omit_tsibble_pivot = meteor_omit_tsibble %>% 
+  pivot_wider(names_from = fall, values_from = count)
+
+ggplot(meteor_omit_tsibble_pivot) + 
+  geom_line(aes(year, Fell, col = "blue")) + 
+  scale_x_continuous(expand = c(0,0)) + 
+  scale_y_continuous(expand = c(0,0)) + 
+  theme_bw() + 
+  scale_colour_manual(values = c("blue")) + 
+  theme(legend.position = "none") + 
+  ggtitle("Meteorite's Fell Was Observed From 1925 to 2013" ) + 
+  xlab("Year") + 
+  ylab("Count")
+  
+```
