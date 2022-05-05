@@ -110,7 +110,7 @@ world_map_meteor = world_map +
           color = fall), 
           alpha = I(0.15)
           ) + 
-  scale_color_manual(values = c("#FFC300", "#C70039")) + 
+  scale_color_manual(values = c("dark blue", "#C70039")) + 
   ggtitle("Global Meteorites From 1925 to 2013") + 
   labs(size = "Mass", color = "Observe")
 world_map_meteor
