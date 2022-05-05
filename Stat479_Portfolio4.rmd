@@ -26,11 +26,13 @@ g = ggplot() +
   ylab("latitude")
 
 #specify the theme of maps
-theme = theme(panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.background = element_rect(fill = "white", colour = "white"),
-        axis.ticks = element_blank(),
-        axis.text = element_blank()
+theme = theme(panel.grid.major = element_line(color = 2,
+                                        size = 0.1,
+                                        linetype = 2),
+        panel.grid.minor = element_line(color = 2,
+                                        size = 0.25,
+                                        linetype = 1),
+        panel.background = element_rect(fill = "white", colour = "white")
         )
 
 #create a ggplot object contain map of US mainland
@@ -46,10 +48,20 @@ us_map = g +
 world_map = g + 
   geom_polygon(data = map_data("world"), 
                aes(long, lat, group = group), 
-               col = "light blue", 
-               fill = "light blue"
+               col = "dark grey", 
+               fill = "dark grey"
                ) + 
-  theme
+  scale_x_continuous(expand = c(0, 0)) + 
+  scale_y_continuous(expand = c(0, 0)) + 
+  theme(panel.grid.major = element_line(color = 2,
+                                        size = 0.1,
+                                        linetype = 2),
+        panel.grid.minor = element_line(color = 2,
+                                        size = 0.25,
+                                        linetype = 1),
+        panel.background = element_rect(fill = "light blue", 
+                                        colour = "light blue")
+        )
 ```
 
 ```{r, message = FALSE}
@@ -75,11 +87,13 @@ meteor_omit_tsibble = meteor %>%
 ```{r, warning = FALSE, message = FALSE, fig.height = 10, fig.width = 15}
 #filter meteors which their landings are observed
 meteor_Obs = meteor_omit_sf %>% 
-  filter(fall == "Fell")
+  filter(fall == "Fell") %>% 
+  mutate(fall = "Fall Observed")
 
 #filter meteors which their landings are not observed
 meteor_nObs = meteor_omit_sf %>%  
-  filter(fall == "Found")
+  filter(fall == "Found") %>% 
+  mutate(fall = "Fall Not Observed")
 
 #plot the global meteor landing maps, 
 #size of the points is encoded with meteor size, 
@@ -87,16 +101,16 @@ meteor_nObs = meteor_omit_sf %>%
 #blue is observed, red is non-observed
 world_map_meteor = world_map + 
   geom_sf(data = meteor_Obs, 
-          aes(size = log(mass), 
+          aes(size = log(mass, 2), 
           color = fall), 
-          alpha = I(0.2)
+          alpha = I(0.25)
           ) + 
   geom_sf(data = meteor_nObs, 
           aes(size = log(mass), 
           color = fall), 
-          alpha = I(0.2)
+          alpha = I(0.15)
           ) + 
-  scale_color_manual(values = c("#5A94FF", "#FF6161")) + 
+  scale_color_manual(values = c("#FFC300", "#C70039")) + 
   ggtitle("Global Meteorites From 1925 to 2013") + 
   labs(size = "Mass", color = "Observe")
 world_map_meteor
@@ -107,8 +121,8 @@ world_map_meteor
 us_map_meteor = us_map + 
   geom_sf(data = meteor_omit_sf, 
           aes(color = year,
-          size = log(mass)), 
-          alpha = I(0.2)
+          size = log(mass, 2)), 
+          alpha = I(0.3)
           ) + 
   scale_colour_distiller(palette = 8, direction = 1) + 
   coord_sf(xlim = c(-128, -62), 
@@ -121,11 +135,21 @@ us_map_meteor
 
 ###Visualization of Meteor Landing Time Series Data
 
-```{r, message = FALSE}
+```{r, message = FALSE, fig.width = 12, fig.height = 5}
 #create a time series visualization with observed/non-observed meteors
-ggplot(meteor_omit_tsibble) + 
+meteor_omit_tsibble_1 = meteor_omit_tsibble %>% 
+  filter(fall == "Fell") %>% 
+  mutate(fall = "Fall Observed")
+
+meteor_omit_tsibble_2 = meteor_omit_tsibble %>% 
+  filter(fall == "Found") %>% 
+  mutate(fall = "Fall Not Observed")
+
+meteor_tsibble = rbind(meteor_omit_tsibble_1, meteor_omit_tsibble_2)
+
+ggplot(meteor_tsibble) + 
   geom_line(aes(year, count, col = fall)) + 
-  facet_wrap(.~ fall) + 
+  facet_wrap(.~ fall, scales = "free") + 
   scale_x_continuous(expand = c(0,0)) + 
   scale_y_continuous(expand = c(0,0)) + 
   theme_bw() + 
@@ -133,20 +157,4 @@ ggplot(meteor_omit_tsibble) +
   ggtitle("Meteorite on Earth From 1925 to 2013") + 
   xlab("Year") + 
   ylab("Count")
-  
-
-meteor_omit_tsibble_pivot = meteor_omit_tsibble %>% 
-  pivot_wider(names_from = fall, values_from = count)
-
-ggplot(meteor_omit_tsibble_pivot) + 
-  geom_line(aes(year, Fell, col = "blue")) + 
-  scale_x_continuous(expand = c(0,0)) + 
-  scale_y_continuous(expand = c(0,0)) + 
-  theme_bw() + 
-  scale_colour_manual(values = c("blue")) + 
-  theme(legend.position = "none") + 
-  ggtitle("Meteorite's Fell Was Observed From 1925 to 2013" ) + 
-  xlab("Year") + 
-  ylab("Count")
-  
 ```
